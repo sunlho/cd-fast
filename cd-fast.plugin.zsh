@@ -11,8 +11,6 @@
 #   setting CD_FAST_OVERWRITE to 1 will overwrite existing commands
 # ==============================================
 
-autoload -Uz compinit && compinit
-
 : "${CD_FAST:=""}"
 : "${CD_FAST_OVERWRITE:=0}"
 
@@ -23,6 +21,7 @@ _cd_fast_setup() {
     local entry alias_name target_dir
 
     for entry in "${entries[@]}"; do
+        entry="${entry//[[:space:]]/}"
         if [[ -z "$entry" ]]; then
             continue
         fi
@@ -45,10 +44,11 @@ _cd_fast_setup() {
 
         [[ -n "${_cd_fast_commands[$command_name]}" ]] && continue
 
-        if (( ! CD_FAST_OVERWRITE )) && \
-            (( $+commands[$command_name] )) || typeset -f "$command_name" >/dev/null; then
-            echo "[cd-fast] Warning: '$command_name' exists (set CD_FAST_OVERWRITE=1 to override)" >&2
-            continue
+        if (( ! CD_FAST_OVERWRITE )); then
+            if (( $+commands[$command_name] )) || typeset -f "$command_name" &>/dev/null; then
+              echo "[cd-fast] Warning: '$command_name' exists (set CD_FAST_OVERWRITE=1 to override)" >&2
+              continue
+            fi
         fi
 
         if [ ! -d "$target_dir" ]; then
@@ -56,25 +56,13 @@ _cd_fast_setup() {
             continue
         fi
 
-        eval "function cd${alias_name}() {
-            if [ ! -d \"${target_dir}\" ]; then
-                echo \"Error: '${target_dir}' does not exist!\" >&2
-                return 1
-            fi
-            if [ \$# -eq 0 ]; then
-                cd \"${target_dir}\"
-            else
-                cd \"${target_dir}/\${1}\"
-            fi
-        }"
+        eval "
+          function ${command_name}() {
+            cd \"${target_dir}\" && cd \"\$@\"
+          }
+        "
 
-        eval "function _cd${alias_name}_completion() {
-            local -a subdirs
-            subdirs=(\$(find \"${target_dir}\" -maxdepth 1 -type d -exec basename {} \; 2>/dev/null))
-            _describe 'cd${alias_name} targets' subdirs
-        }"
-
-        compdef "_cd${alias_name}_completion" "cd${alias_name}"
+        compctl -W "${target_dir}" -/ "${command_name}"
 
         _cd_fast_commands[$command_name]=1
     done
