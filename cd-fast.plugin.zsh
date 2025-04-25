@@ -58,7 +58,13 @@ _cd_fast_setup() {
 
         eval "
           function ${command_name}() {
-            cd \"${target_dir}\" && cd \"\$@\"
+            # 如果没有传入任何参数，直接进入目标目录
+            if [[ \$# -eq 0 ]]; then
+              cd \"${target_dir}\"
+            else
+              # 否则，根据参数进入目标目录的相对路径
+              cd \"${target_dir}\" && cd \"\$@\"
+            fi
           }
         "
 
